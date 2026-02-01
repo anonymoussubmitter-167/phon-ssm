@@ -1,16 +1,30 @@
 # PhonSSM: Phonological State Space Model for Sign Language Recognition
 
-A novel architecture for skeleton-based sign language recognition that achieves state-of-the-art performance using only pose landmarks (no RGB video). PhonSSM incorporates linguistic priors from sign language phonology to achieve superior accuracy with dramatically fewer parameters.
+A novel architecture for skeleton-based sign language recognition that incorporates linguistic priors from sign language phonology. PhonSSM achieves state-of-the-art performance on standard benchmarks using only pose landmarks (no RGB video), with 3.2M parameters.
 
 ## Key Results
 
-| Dataset | Classes | Top-1 Accuracy | Previous SOTA | Improvement |
-|---------|---------|----------------|---------------|-------------|
+### External Benchmarks (WLASL)
+
+These results are from **separate models trained and evaluated on each WLASL subset** using the standard train/test splits, to enable direct comparison with prior work. Each WLASL model is trained independently on that subset's training data using pose + hands (75 landmarks).
+
+| Dataset | Classes | Top-1 Accuracy | Previous SOTA (Skeleton) | Improvement |
+|---------|---------|----------------|--------------------------|-------------|
 | WLASL100 | 100 | **88.37%** | 63.18% (DSTA-SLR) | +25.19 pts |
 | WLASL300 | 300 | **74.41%** | 58.42% (DSTA-SLR) | +15.99 pts |
 | WLASL1000 | 1,000 | **62.90%** | 47.14% (DSTA-SLR) | +15.76 pts |
 | WLASL2000 | 2,000 | **72.08%** | 53.70% (DSTA-SLR) | +18.38 pts |
-| Merged-5565 | 5,565 | **53.34%** | - | New benchmark |
+
+### Main Model (Merged-5565)
+
+The primary model is trained on **Merged-5565**, a custom large-scale dataset we constructed by combining multiple ASL sources (WLASL, ASL Citizen, SignBank, and others). This is a different dataset with a different format and scale than the WLASL benchmarks above.
+
+- **5,565 unique sign classes**
+- **260,000+ training samples**
+- **Dominant hand only** (21 landmarks) — different input modality from WLASL benchmarks
+- **Top-1 Accuracy: 53.34%**
+
+> **Note:** The WLASL benchmark results and the Merged-5565 results are **not directly comparable** — they use different training data, different input modalities (75 vs 21 landmarks), and different vocabulary sizes. The WLASL experiments validate PhonSSM's architecture against published baselines; the Merged-5565 model is the full-scale deployment model.
 
 **Key advantages:**
 - **3.2M parameters** vs 25M+ for RGB-based methods
@@ -105,7 +119,9 @@ pip install tensorflow>=2.15.0
 
 ## Quick Start
 
-### Training on WLASL
+### Training on WLASL (External Benchmarks)
+
+These train separate models on each WLASL subset for benchmark comparison:
 
 ```bash
 # Train on WLASL100
@@ -144,7 +160,7 @@ phon-ssm/
 │       ├── bissm.py             # Bidirectional State Space
 │       └── hpc.py               # Hierarchical Prototypes
 ├── training/
-│   ├── benchmark_external.py    # Main training script
+│   ├── benchmark_external.py    # WLASL benchmark training script
 │   ├── train_diagnosis.py       # Error diagnosis model
 │   └── train_movement.py        # Movement analyzer model
 ├── analysis/
@@ -176,6 +192,8 @@ PhonSSM accepts skeleton landmarks extracted via MediaPipe:
 
 Input shape: `(batch_size, 30, 225)`
 
+> For the Merged-5565 main model, input is dominant hand only: 21 landmarks × 3 = 63 features per frame.
+
 ### Preprocessing
 1. Uniform temporal sampling to 30 frames
 2. Spatial normalization: center at wrist, scale by max landmark distance
@@ -185,10 +203,10 @@ Input shape: `(batch_size, 30, 225)`
 
 | Component | Parameters | Description |
 |-----------|------------|-------------|
-| AGAN | ~800K | Graph attention on 75 landmarks |
+| AGAN | ~800K | Graph attention on landmarks |
 | PDM | ~130K | 4 orthogonal subspaces (32-dim each) |
 | BiSSM | ~1.5M | Bidirectional selective state space |
-| HPC | ~800K | Prototype classifier (for 2000 classes) |
+| HPC | ~800K | Prototype classifier (varies by class count) |
 | **Total** | **~3.2M** | Full PhonSSM model |
 
 ### Inference Performance
@@ -198,7 +216,9 @@ Input shape: `(batch_size, 30, 225)`
 
 ## Detailed Results
 
-### WLASL Benchmarks
+### WLASL Benchmarks (Separate Models Per Subset)
+
+Each row is a separately trained model on that WLASL subset's training split:
 
 | Dataset | Classes | Test Samples | Top-1 | Top-5 | Top-10 |
 |---------|---------|--------------|-------|-------|--------|
@@ -207,14 +227,7 @@ Input shape: `(batch_size, 30, 225)`
 | WLASL1000 | 1,000 | 5,628 | 62.90% | 82.60% | 86.35% |
 | WLASL2000 | 2,000 | 8,634 | 72.08% | 86.26% | 88.56% |
 
-### Large-Scale Benchmark: Merged-5565
-
-Combined dataset from WLASL, ASL Citizen, and SignBank:
-- **5,565 unique signs**
-- **260,000+ samples**
-- **Top-1 Accuracy: 53.34%**
-
-### Comparison with Prior Work
+### Comparison with Prior Work (on WLASL)
 
 | Method | Input Type | Params | WLASL100 | WLASL2000 |
 |--------|------------|--------|----------|-----------|
@@ -225,7 +238,33 @@ Combined dataset from WLASL, ASL Citizen, and SignBank:
 | NLA-SLR | RGB+Skeleton | 42M | 67.54% | - |
 | **PhonSSM (Ours)** | **Skeleton** | **3.2M** | **88.37%** | **72.08%** |
 
-### Few-Shot Performance
+### Main Model: Merged-5565
+
+Trained on our custom large-scale dataset (different from WLASL):
+
+| Property | Value |
+|----------|-------|
+| Sign classes | 5,565 |
+| Training samples | 260,000+ |
+| Input modality | Dominant hand (21 landmarks) |
+| Top-1 Accuracy | 53.34% |
+
+**Dataset Sources for Merged-5565:**
+
+| Source | Signs | Samples | Reference |
+|--------|-------|---------|-----------|
+| [WLASL](https://dxli94.github.io/WLASL/) | 2,000 | 21,083 | Li et al., 2020 |
+| [ASL Citizen](https://www.microsoft.com/en-us/research/project/asl-citizen/) | 2,731 | 83,399 | Desai et al., 2024 |
+| [SignBank](https://signbank.org/) | 3,414 | 48,789 | Gutierrez-Sigut et al. |
+| [ASL-LEX](https://asl-lex.org/) | 2,723 | 2,723 | Caselli et al., 2017 |
+| [Sem-Lex](https://github.com/language-and-brain-lab/sem-lex-benchmark) | 984 | 91,128 | Sehyr et al., 2021 |
+| [MVP](https://www.kaggle.com/datasets/danaroth/asl-signs-dataset) | 250 | 94,477 | Google |
+| [ASL Alphabet](https://www.kaggle.com/datasets/grassknoted/asl-alphabet) | 29 | 87,000 | Kaggle |
+| [ASL MNIST](https://www.kaggle.com/datasets/datamunge/sign-language-mnist) | 26 | 34,627 | Kaggle |
+| [ChicagoFSWild](https://ttic.uchicago.edu/~klivescu/ChicagoFSWild.htm) | 26 | 7,304 | Shi et al., 2018 |
+| **Merged (deduplicated)** | **5,565** | **260,000+** | |
+
+### Few-Shot Performance (Merged-5565)
 
 PhonSSM excels on classes with limited training data:
 
